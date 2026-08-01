@@ -38,9 +38,10 @@ At the start of EVERY session, before anything else:
 
 1. Read `.specs/project/STATE.md` (persistent memory).
 2. If `.specs/graph/graph.json` exists:
-   - Staleness check: any code or `.specs/**/*.md` newer than `graph.json`
-     (`(Get-Item .specs/graph/graph.json).LastWriteTime`)? → run
-     `graphify . --update --no-viz` first.
+   - Staleness check — detect OS first, then compare file mtimes:
+     - Windows: `(Get-Item .specs/graph/graph.json).LastWriteTime`
+     - macOS/Linux: `stat -c %Y .specs/graph/graph.json` (Linux) or `stat -f %m .specs/graph/graph.json` (macOS)
+     - If any source or `.specs/**/*.md` is newer → run `graphify . --update --no-viz` first.
    - Answer codebase questions with `graphify query` / `path` / `explain`
      (~1–3k tokens) instead of reading raw source files (20–50k tokens).
    - Full rebuild (`graphify .`) only when files were deleted/moved — detect via

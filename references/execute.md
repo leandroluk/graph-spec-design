@@ -56,11 +56,20 @@ Scope: module or feature slug
 
 If commits were made → the post-commit hook handles `graphify --update` automatically.
 
-If edits are uncommitted (WIP):
+If edits are uncommitted (WIP), run manually — detect OS first:
+
+**PowerShell (Windows):**
 ```powershell
 $env:GRAPHIFY_OUT = ".specs/graph"
 $py = Get-Content .specs/graph/.graphify_python
 & $py -m graphify . --update --no-viz
+```
+
+**bash (macOS/Linux):**
+```bash
+export GRAPHIFY_OUT=".specs/graph"
+py=$(cat .specs/graph/.graphify_python)
+"$py" -m graphify . --update --no-viz
 ```
 
 ## STATE.md update

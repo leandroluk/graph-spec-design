@@ -75,15 +75,26 @@ Append to the relevant sections:
 
 ### 3. Update the graph
 
+If commits were made, the post-commit hook already handled it. For uncommitted edits (WIP):
+
+**PowerShell (Windows):**
 ```powershell
-# Only if there are uncommitted edits
 $dirty = git status --porcelain 2>$null
 if ($dirty) {
     $env:GRAPHIFY_OUT = ".specs/graph"
     $py = Get-Content .specs/graph/.graphify_python -ErrorAction SilentlyContinue
     if ($py) { & $py -m graphify . --update --no-viz }
 }
-# If commits were made, the post-commit hook already handled it.
+```
+
+**bash (macOS/Linux):**
+```bash
+dirty=$(git status --porcelain 2>/dev/null)
+if [ -n "$dirty" ]; then
+    export GRAPHIFY_OUT=".specs/graph"
+    py=$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
+    "$py" -m graphify . --update --no-viz
+fi
 ```
 
 ### 4. Confirm to user

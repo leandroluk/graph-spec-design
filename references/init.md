@@ -3,18 +3,51 @@
 Run this phase when `.specs/graph/graph.json` does not exist, or when the user
 explicitly asks to "initialize project" or "map codebase".
 
-## 0.1 — Create directory structure
+## 0.1 — Detect OS and shell
 
+Before running any command, detect the operating system:
+
+```
+IF Windows  → use PowerShell commands (pwsh / powershell)
+IF macOS    → use bash/zsh commands
+IF Linux    → use bash commands
+```
+
+Detection (the agent reads the environment, not the user):
+- Windows: `$env:OS -eq "Windows_NT"` or `[System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)`
+- macOS/Linux: `uname -s` returns `Darwin` or `Linux`
+
+All commands below are shown in **PowerShell** (Windows) and **bash** (macOS/Linux) variants.
+The agent selects the correct one automatically based on the detected OS.
+
+---
+
+## 0.2 — Create directory structure
+
+**PowerShell (Windows):**
 ```powershell
 New-Item -ItemType Directory -Force -Path `
   .specs/project, .specs/codebase, .specs/features, .specs/quick, .specs/graph | Out-Null
 ```
 
-## 0.2 — Set GRAPHIFY_OUT and build the graph
+**bash (macOS/Linux):**
+```bash
+mkdir -p .specs/project .specs/codebase .specs/features .specs/quick .specs/graph
+```
+
+---
+
+## 0.3 — Set GRAPHIFY_OUT and build the graph
 
 All graphify invocations MUST set `GRAPHIFY_OUT` so artifacts land in `.specs/graph/`
 instead of the default `graphify-out/` at the project root.
 
+> Running on `.` (repo root) makes graphify process **source code** (AST) AND
+> **`.specs/*.md`** (semantic). This connects `REQ-001` in `spec.md` to the modules
+> that implement it — enabling `graphify query "what implements REQ-001?"` to return
+> exact file+function references.
+
+**PowerShell (Windows):**
 ```powershell
 $env:GRAPHIFY_OUT = ".specs/graph"
 
@@ -35,26 +68,49 @@ if (-not $py) {
 }
 if (-not $py) {
     Write-Error "graphify not found. Install: uv tool install graphifyy"
-    # DEGRADED MODE: continue without graph (spec-driven flow uses direct file reads)
-    exit 0
+    exit 0  # degraded mode — see section 0.6
 }
 
 # Save interpreter path for future use (commit hook, --update calls)
 $py | Out-File -FilePath .specs/graph/.graphify_python -Encoding utf8 -NoNewline
 
-# Run on repo root — scans BOTH source code (AST) AND .specs/*.md (semantic)
-# This connects REQ-001 in spec.md to the modules that implement it in the graph.
 & $py -m graphify .
 ```
 
-> **Why scan the root and not just `src/`?**
-> Running on `.` makes graphify process source code via AST extraction and
-> `.specs/*.md` via semantic extraction. Requirements like `REQ-001` become graph
-> nodes connected to the code symbols that implement them — enabling queries like
-> "what implements REQ-001?" to return exact file+function references.
+**bash (macOS/Linux):**
+```bash
+export GRAPHIFY_OUT=".specs/graph"
 
-## 0.3 — Install post-commit hook (git projects only)
+# Detect graphify Python interpreter (uv → pipx → active env)
+py=""
+if command -v uv &>/dev/null; then
+    uv_dir=$(uv tool dir 2>/dev/null)
+    candidate="$uv_dir/graphifyy/bin/python"
+    if [ -f "$candidate" ] && "$candidate" -c "import graphify" &>/dev/null; then
+        py="$candidate"
+    fi
+fi
+if [ -z "$py" ] && command -v python &>/dev/null; then
+    if python -c "import graphify" &>/dev/null; then
+        py=$(python -c "import sys; print(sys.executable)")
+    fi
+fi
+if [ -z "$py" ]; then
+    echo "graphify not found. Install: uv tool install graphifyy" >&2
+    exit 0  # degraded mode — see section 0.6
+fi
 
+# Save interpreter path for future use (commit hook, --update calls)
+echo -n "$py" > .specs/graph/.graphify_python
+
+"$py" -m graphify .
+```
+
+---
+
+## 0.4 — Install post-commit hook (git projects only)
+
+**PowerShell (Windows):**
 ```powershell
 if (Test-Path .git) {
     New-Item -ItemType Directory -Force -Path .git/hooks | Out-Null
@@ -67,13 +123,31 @@ PY=`$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
 "@ | Out-File -FilePath .git/hooks/post-commit -Encoding utf8 -NoNewline
     Write-Host "Hook installed: graphify --update will run after every commit."
 } else {
-    Write-Host "No git repo found — hook skipped."
-    Write-Host "Remember to run 'graphify . --update' manually after significant changes."
-    # Log reminder in STATE.md
+    Write-Host "No .git found — hook skipped. See section 0.6 for manual sync."
 }
 ```
 
-## 0.4 — Read GRAPH_REPORT.md and seed codebase docs
+**bash (macOS/Linux):**
+```bash
+if [ -d .git ]; then
+    mkdir -p .git/hooks
+    cat > .git/hooks/post-commit << 'EOF'
+#!/bin/sh
+# graph-spec-design: update knowledge graph after every commit
+export GRAPHIFY_OUT=".specs/graph"
+PY=$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
+"$PY" -m graphify . --update --no-viz > /dev/null 2>&1 &
+EOF
+    chmod +x .git/hooks/post-commit
+    echo "Hook installed: graphify --update will run after every commit."
+else
+    echo "No .git found — hook skipped. See section 0.6 for manual sync."
+fi
+```
+
+---
+
+## 0.5 — Read GRAPH_REPORT.md and seed codebase docs
 
 After the build, read `.specs/graph/GRAPH_REPORT.md` and use its output to:
 
@@ -81,15 +155,17 @@ After the build, read `.specs/graph/GRAPH_REPORT.md` and use its output to:
 - **Community Hubs** section → seed `.specs/codebase/ARCHITECTURE.md` with module groupings
 - **Token cost** → record in `.specs/project/STATE.md` under `## Cost`
 
-## 0.5 — Degraded mode (graphify unavailable)
+---
 
-If graphify cannot be installed (no Python, restricted environment):
+## 0.6 — Degraded mode (graphify unavailable)
 
-- Skip steps 0.2–0.4
+If graphify cannot be installed (no Python, restricted environment, user declined):
+
+- Skip steps 0.3–0.5
 - Record in `.specs/project/STATE.md`:
   ```markdown
   ## Degraded Mode
   - graphify not available. All context loaded from raw files.
   - Token budget: load only the active feature spec + STATE.md per session.
   ```
-- Continue with spec-driven flow using direct file reads — no phase is blocked.
+- Continue with spec-driven flow using direct file reads — no phase is ever blocked.

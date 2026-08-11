@@ -41,16 +41,23 @@ At the start of EVERY session, before anything else:
    - Staleness check — detect OS first, then compare file mtimes:
      - Windows: `(Get-Item .specs/graph/graph.json).LastWriteTime`
      - macOS/Linux: `stat -c %Y .specs/graph/graph.json` (Linux) or `stat -f %m .specs/graph/graph.json` (macOS)
-     - If any source or `.specs/**/*.md` is newer → run `graphify . --update --no-viz` first.
-   - Answer codebase questions with `graphify query` / `path` / `explain`
+     - If any source or `.specs/**/*.md` is newer → run `graph-spec-design . --update --no-viz` first.
+   - Answer codebase questions with `graph-spec-design query` / `path` / `explain`
      (~1–3k tokens) instead of reading raw source files (20–50k tokens).
-   - Full rebuild (`graphify .`) only when files were deleted/moved — detect via
+     **CRITICAL HEURISTIC:** For behavioral, business logic, or detailed implementation questions, DO NOT use query. Instead, use file reading tools to directly inspect the 2-3 relevant files. The query tool is strictly for structural/topological questions (e.g., "what calls X?", "which modules depend on Y").
+   - Full rebuild (`graph-spec-design .`) only when files were deleted/moved — detect via
      `git diff --name-status <anchor>..HEAD` containing `D`/`R` entries;
      `--update` over deletes/renames leaves phantom nodes.
 3. If it does not exist → run Phase 0 ([references/init.md](references/init.md)).
-4. If graphify is not installed → offer to install; on decline/failure, enter
-   **degraded mode**: the spec-driven flow continues with direct file reads, no
-   phase is ever blocked. Details in [references/init.md](references/init.md).
+4. If `graph-spec-design` is not installed → install it automatically using `uv` (preferred) or `pip`:
+   ```powershell
+   if (Get-Command uv -ErrorAction SilentlyContinue) {
+       uv tool install --upgrade git+https://github.com/leandroluk/graph-spec-design
+   } else {
+       pip install --upgrade git+https://github.com/leandroluk/graph-spec-design
+   }
+   ```
+   On decline/failure, enter **degraded mode**: the spec-driven flow continues with direct file reads, no phase is ever blocked. Details in [references/init.md](references/init.md).
 
 ## The Three Guarantees
 
@@ -107,7 +114,7 @@ Load ONLY the reference for the active phase:
 | implement, execute, quick fix, bug fix       | [references/execute.md](references/execute.md) |
 | resume work, pause work, end session         | [references/session.md](references/session.md) |
 | (automatic at session start / pre-Specify)   | [references/drift.md](references/drift.md)     |
-| how does X work, what calls Y, trace, impact | `graphify query` / `path` / `explain` directly |
+| how does X work, what calls Y, trace, impact | `graph-spec-design query` / `path` / `explain` directly |
 
 ## Context Budget
 

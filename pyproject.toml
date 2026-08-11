@@ -1,0 +1,16 @@
+[project]
+name = "graph-spec-design"
+version = "0.1.0"
+description = "A graphify wrapper for TLC Spec-Driven development"
+requires-python = ">=3.10"
+dependencies = [
+    "graphifyy>=0.3.10",
+    "tree-sitter-rust",
+]
+
+[project.scripts]
+graph-spec-design = "graph_spec_design.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -96,10 +96,7 @@ first. More than 5 steps or complex dependencies → stop, create `tasks.md`.
 └── graph/              # generated — graph.json, GRAPH_REPORT.md, cache/ ...
 ```
 
-No `graphify-out/` directory exists. Every graphify invocation (CLI or library)
-MUST set the env var `GRAPHIFY_OUT=.specs/graph` first — PowerShell:
-`$env:GRAPHIFY_OUT = ".specs/graph"` — so all artifacts land in `.specs/graph/`
-directly. Forgetting the var silently recreates `graphify-out/` at the root.
+No `graphify-out/` directory exists. The `graph-spec-design` wrapper automatically defaults to outputting all artifacts to the `.specs/graph/` directory. You no longer need to manually set the `GRAPHIFY_OUT` environment variable.
 
 ## Trigger Map
 

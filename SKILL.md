@@ -4,7 +4,7 @@ description: "Use when starting a work session, initializing or mapping a projec
 license: CC-BY-4.0
 metadata:
   author: leandroluk
-  version: 2.0.0
+  version: 2.1.0
 ---
 
 # Graph-Spec-Design
@@ -36,8 +36,13 @@ Skill files are en-US; always respond in the user's language.
 
 At the start of EVERY session, before anything else:
 
-1. Read `.specs/project/STATE.md` (persistent memory).
-2. If `.specs/graph/graph.json` exists:
+1. **Check STATE.md size** — before reading:
+   - Windows: `(Get-Item .specs/project/STATE.md).Length / 1KB`
+   - macOS/Linux: `du -k .specs/project/STATE.md | cut -f1`
+   - If > 30 KB → run compaction first ([references/state_compaction.md](references/state_compaction.md)). Compaction is automatic — do not ask the user.
+2. **Read `.specs/project/STATE.md`** (persistent memory — hot state only).
+   - Never read `STATE_ARCHIVE.md` unless the user explicitly asks for history.
+3. If `.specs/graph/graph.json` exists:
    - Staleness check — detect OS first, then compare file mtimes:
      - Windows: `(Get-Item .specs/graph/graph.json).LastWriteTime`
      - macOS/Linux: `stat -c %Y .specs/graph/graph.json` (Linux) or `stat -f %m .specs/graph/graph.json` (macOS)
@@ -48,8 +53,8 @@ At the start of EVERY session, before anything else:
    - Full rebuild (`graph-spec-design .`) only when files were deleted/moved — detect via
      `git diff --name-status <anchor>..HEAD` containing `D`/`R` entries;
      `--update` over deletes/renames leaves phantom nodes.
-3. If it does not exist → run Phase 0 ([references/init.md](references/init.md)).
-4. If `graph-spec-design` is not installed → install it automatically using `uv` (preferred) or `pip`:
+4. If it does not exist → run Phase 0 ([references/init.md](references/init.md)).
+5. If `graph-spec-design` is not installed → install it automatically using `uv` (preferred) or `pip`:
    ```powershell
    if (Get-Command uv -ErrorAction SilentlyContinue) {
        uv tool install --upgrade git+https://github.com/leandroluk/graph-spec-design
@@ -87,13 +92,17 @@ first. More than 5 steps or complex dependencies → stop, create `tasks.md`.
 
 ```
 .specs/
-├── HANDOFF.md          # ephemeral resumption pointer (see session.md) — may be absent
-├── project/            # PROJECT.md, ROADMAP.md, STATE.md
-├── codebase/           # STACK, ARCHITECTURE, CONVENTIONS, STRUCTURE,
-│                       # TESTING, INTEGRATIONS, CONCERNS
-├── features/[name]/    # spec.md, context.md?, design.md?, tasks.md?
-├── quick/NNN-slug/     # TASK.md, SUMMARY.md
-└── graph/              # generated — graph.json, GRAPH_REPORT.md, cache/ ...
+├── HANDOFF.md                  # ephemeral resumption pointer (see session.md) — may be absent
+├── project/
+│   ├── PROJECT.md
+│   ├── ROADMAP.md
+│   ├── STATE.md                # hot state — always < 30 KB (windowed sections)
+│   └── STATE_ARCHIVE.md        # historical overflow — never auto-loaded
+├── codebase/                   # STACK, ARCHITECTURE, CONVENTIONS, STRUCTURE,
+│                               # TESTING, INTEGRATIONS, CONCERNS
+├── features/[name]/            # spec.md, context.md?, design.md?, tasks.md?
+├── quick/NNN-slug/             # TASK.md, SUMMARY.md
+└── graph/                      # generated — graph.json, GRAPH_REPORT.md, cache/ ...
 ```
 
 No `graphify-out/` directory exists. The `graph-spec-design` wrapper automatically defaults to outputting all artifacts to the `.specs/graph/` directory. You no longer need to manually set the `GRAPHIFY_OUT` environment variable.
@@ -111,14 +120,18 @@ Load ONLY the reference for the active phase:
 | implement, execute, quick fix, bug fix       | [references/execute.md](references/execute.md) |
 | resume work, pause work, end session         | [references/session.md](references/session.md) |
 | (automatic at session start / pre-Specify)   | [references/drift.md](references/drift.md)     |
+| STATE.md > 30 KB (automatic)                 | [references/state_compaction.md](references/state_compaction.md) |
+| show state history, archived decisions       | `STATE_ARCHIVE.md` — read on demand only       |
 | how does X work, what calls Y, trace, impact | `graph-spec-design query` / `path` / `explain` directly |
 
 ## Context Budget
 
-- Base load per session: STATE.md + (planning sessions only) PROJECT.md. Target <15k tokens.
+- **STATE.md hard limit: 30 KB.** Compact automatically before reading if exceeded.
+- Base load per session: STATE.md (≤ 30 KB) + (planning sessions only) PROJECT.md. Target <15k tokens.
 - On demand: active feature's spec/design/tasks; graph queries replace code reads.
 - Never simultaneously: multiple feature specs, multiple architecture docs, raw
   source files when the graph is fresh.
+- `STATE_ARCHIVE.md` is never preloaded — only on explicit user request.
 
 ## Honesty Rules
 

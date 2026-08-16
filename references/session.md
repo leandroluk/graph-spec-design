@@ -33,23 +33,48 @@ is approaching the token budget limit.
 
 ### 1. Update STATE.md
 
-Append to the relevant sections:
+Append to the relevant sections using the windowed structure:
+
+- `Recent Progress (Last 10)` — prepend new entry; if count > 10, move oldest to `STATE_ARCHIVE.md`
+- `Recent Decisions (Last 15)` — prepend new entry; if count > 15, move oldest to `STATE_ARCHIVE.md`
+- `Lessons Learned (Last 5)` — prepend new entry; if count > 5, move oldest to `STATE_ARCHIVE.md`
+- `Todos` — append new `[ ]` items; mark finished items `[x]`
+- `Active Blockers` — update list
+- `Current Work` — rewrite with current status
 
 ```markdown
-## Progress
+## Recent Progress (Last 10)
 - [ISO date] [feature] T-00N complete. Gate: N/N pass. Commit: [sha].
 
-## Decisions
+## Recent Decisions (Last 15)
 - [ISO date] [decision made this session]
 
-## Blockers
+## Active Blockers
 - [ISO date] [blocker encountered — or "none"]
 
 ## Todos
 - [ ] [next atomic step for next session]
 ```
 
-### 2. Write HANDOFF.md (ephemeral)
+### 2. Check STATE.md size — compact if needed
+
+After writing STATE.md, check if it exceeds 30 KB:
+
+**PowerShell (Windows):**
+```powershell
+$sizeKB = [math]::Round((Get-Item .specs/project/STATE.md).Length / 1KB, 1)
+if ($sizeKB -gt 30) { Write-Host "STATE.md at $sizeKB KB — running compaction..." }
+```
+
+**bash (macOS/Linux):**
+```bash
+size_kb=$(du -k .specs/project/STATE.md | cut -f1)
+if [ "$size_kb" -gt 30 ]; then echo "STATE.md at ${size_kb}KB — running compaction..."; fi
+```
+
+If exceeded → run [state_compaction.md](state_compaction.md) protocol before step 3.
+
+### 3. Write HANDOFF.md (ephemeral)
 
 ```markdown
 # Handoff — [ISO date]

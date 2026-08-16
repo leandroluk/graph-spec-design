@@ -157,6 +157,32 @@ After the build, read `.specs/graph/GRAPH_REPORT.md` and use its output to:
 
 ---
 
+## 0.5b — Detect legacy STATE.md and migrate
+
+If `.specs/project/STATE.md` already exists, check if it uses the legacy format
+(unbounded sections `## Progress`, `## Decisions` without window notation):
+
+**PowerShell (Windows):**
+```powershell
+$stateContent = Get-Content .specs/project/STATE.md -Raw -ErrorAction SilentlyContinue
+$isLegacy = $stateContent -match "^## Progress" -or $stateContent -match "^## Decisions"
+$sizeKB = [math]::Round((Get-Item .specs/project/STATE.md -ErrorAction SilentlyContinue)?.Length / 1KB, 1)
+```
+
+**bash (macOS/Linux):**
+```bash
+state_content=$(cat .specs/project/STATE.md 2>/dev/null || echo "")
+is_legacy=$(echo "$state_content" | grep -c "^## Progress\|^## Decisions")
+size_kb=$(du -k .specs/project/STATE.md 2>/dev/null | cut -f1 || echo 0)
+```
+
+If the file is legacy OR if `$sizeKB > 30`:
+- Run the compaction protocol: [references/state_compaction.md](state_compaction.md)
+- The protocol will migrate legacy section names to windowed names and archive the overflow
+- Report to user: `STATE.md migrated to windowed format: <before> KB → <after> KB`
+
+---
+
 ## 0.6 — Degraded mode (graphify unavailable)
 
 If graphify cannot be installed (no Python, restricted environment, user declined):

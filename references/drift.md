@@ -20,6 +20,9 @@ tree, so it is the freshness check and the fix in one cheap command.
 nexspec sync    # prints: added=N modified=N deleted=N dirty=N
 ```
 
+If it fails with `Database already open. Cannot acquire lock`, the post-commit hook's background sync is
+still running — wait for it to finish and retry (do not delete the index).
+
 **Action:** run it automatically (it only writes the generated `.specs/.index/`, never
 user files) and report the counts. Renames/deletes need no special handling — they are
 applied incrementally. If `sync` errors, try `nexspec sync --resume` (replays the WAL);

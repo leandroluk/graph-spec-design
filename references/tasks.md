@@ -8,7 +8,10 @@
 
 Path: `.specs/features/[feature-slug]/tasks.md`
 
-Task IDs use the `TASK-NNN` form — nexspec indexes `### TASK-NNN` headings and links them to the `REQ-NNN` in their body.
+Task IDs use the `TASK-NNN` form, optionally feature-prefixed (`TASK-CTR-001`; recommended, ids are global).
+nexspec indexes `### TASK-…:` headings and links each to every `REQ-…` in its body — paragraphs **and**
+bullets like `- **REQ**: REQ-CTR-001`, even when the REQ lives in another file (`spec.md`).
+`nexspec trace REQ-CTR-001` then lists the tasks/code that satisfy it (marked `<-`).
 
 Each task must be atomic — completable in one sub-agent call with a verifiable outcome.
 

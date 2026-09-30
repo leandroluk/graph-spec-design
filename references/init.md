@@ -84,6 +84,9 @@ nexspec sync     # indexes code (Tree-sitter) + .specs/*.md (REQ/TASK/ADR marker
 
 `nexspec` syncs from **Git history**, so the project must be a Git repository.
 
+After upgrading the `nexspec` binary (`cargo install --git … --force`), rebuild the index once when the
+release notes change id/schema semantics: `rm -rf .specs/.index && nexspec init && nexspec sync`.
+
 Optional — register the MCP server so the agent gets `query_context`,
 `trace_requirement`, `find_impacted_code`, `get_symbol_history` and `sync_workspace`
 as native tools:

@@ -40,7 +40,7 @@ One paragraph describing what this feature does and why.
 ## Affected Components (from graph)
 - `NodeId_A` — [role in this feature]
 - `NodeId_B → NodeId_C` — [call path identified via `nexspec trace`]
-- `NodeId_X` ⚠️ God Node (degree N) — changes here have wide impact
+- `NodeId_X` ⚠️ high fan-in (N dependants via `nexspec trace`) — changes here have wide impact
 
 ## Out of Scope
 - [explicit exclusion 1]

@@ -48,11 +48,11 @@ Path: `.specs/features/[feature-slug]/design.md`
 ## Modified Components
 | Component | Change | Risk |
 |---|---|---|
-| [NodeX] | [what changes] | God Node — high impact |
+| [NodeX] | [what changes] | High fan-in — many dependants in `nexspec trace` |
 
 ## Risks
-- [NodeX] is a God Node (degree N) — any change propagates widely
-- [Community Y] has cohesion score 0.3 — fragile, test thoroughly
+- [NodeX] has N dependants (`nexspec trace`) — any change propagates widely
+- [Area Y] co-changes with many unrelated files (`nexspec blame`) — fragile, test thoroughly
 
 ## Decision Log
 - [decision made during design and why]
@@ -62,7 +62,7 @@ Path: `.specs/features/[feature-slug]/design.md`
 
 ```markdown
 ## Decisions
-- [ISO date] Design complete for "[feature]". Key risk: [God Node name].
+- [ISO date] Design complete for "[feature]". Key risk: [highest fan-in component].
 
 ## Todos
 - [ ] Tasks phase for [feature name]

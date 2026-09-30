@@ -41,7 +41,7 @@ Each task must be atomic — completable in one sub-agent call with a verifiable
 ## Breakdown rules
 
 1. One task = one atomic change + one gate check
-2. Tasks touching God Nodes get their own task (no bundling with other changes)
+2. Tasks touching high fan-in components (many dependants in `nexspec trace`, e.g. base classes and shared ports) get their own task (no bundling with other changes)
 3. Mark `[P]` on tasks with no shared dependencies — they run in parallel via sub-agents
 4. If a task has more than 3 files or more than one conceptual concern → split it
 5. Maximum ~15 tasks per feature. More than 15 → the feature should be split.

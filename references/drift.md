@@ -11,44 +11,19 @@ Never block the workflow — report findings, propose fixes, ask before applying
 
 ## Detection steps
 
-### 1. Graph staleness
+### 1. Index freshness
 
-**PowerShell (Windows):**
-```powershell
-$graphJson = ".specs/graph/graph.json"
-if (Test-Path $graphJson) {
-    $graphTime = (Get-Item $graphJson).LastWriteTime
-    $stale = Get-ChildItem -Recurse -File |
-        Where-Object {
-            $_.FullName -notmatch '\\\.specs\\graph\\' -and
-            $_.FullName -notmatch '\\node_modules\\' -and
-            $_.LastWriteTime -gt $graphTime
-        } | Select-Object -First 10
-    if ($stale) {
-        Write-Host "DRIFT: graph.json is stale. Newer files:"
-        $stale | ForEach-Object { Write-Host "  $($_.FullName)" }
-    }
-}
-```
+No mtime comparison is needed: `nexspec sync` diffs Git trees plus the dirty working
+tree, so it is the freshness check and the fix in one cheap command.
 
-**bash (macOS/Linux):**
 ```bash
-graph_json=".specs/graph/graph.json"
-if [ -f "$graph_json" ]; then
-    graph_time=$(stat -c %Y "$graph_json" 2>/dev/null || stat -f %m "$graph_json")
-    stale=$(find . -not -path '*/.specs/graph/*' -not -path '*/node_modules/*' \
-        -newer "$graph_json" -type f | head -10)
-    if [ -n "$stale" ]; then
-        echo "DRIFT: graph.json is stale. Newer files:"
-        echo "$stale"
-    fi
-fi
+nexspec sync    # prints: added=N modified=N deleted=N dirty=N
 ```
 
-**Action on stale graph:**
-- If stale files include only additions/edits → propose `graphify . --update --no-viz`
-- If git log shows `D` (deleted) or `R` (renamed) entries since last graph build → propose full `graphify .` rebuild (phantom nodes from --update over deletes)
-- Always ask user before running — do not auto-apply
+**Action:** run it automatically (it only writes the generated `.specs/.index/`, never
+user files) and report the counts. Renames/deletes need no special handling — they are
+applied incrementally. If `sync` errors, try `nexspec sync --resume` (replays the WAL);
+as a last resort delete `.specs/.index/` and run `nexspec init && nexspec sync`.
 
 ### 2. Git vs STATE.md divergence
 
@@ -81,16 +56,17 @@ fi
 ```
 
 **Action on STATE.md divergence:**
-- Summarize commits into STATE.md `## Progress` section
+- Summarize commits into STATE.md `## Recent Progress` section
 - Ask user to confirm before writing
 
 ### 3. Spec vs implementation divergence (before Design/Implement)
 
-Query the graph for nodes tagged with requirement IDs and check if corresponding
-spec.md entries still exist:
+Run the `trace` line only when `Traceability: on` in `.specs/project/PROJECT.md`. Otherwise trace each active REQ-ID to confirm it still
+reaches code, and check that uncommitted work still maps to a spec:
 
-```
-graphify query "Which REQ-IDs appear in the codebase that are not in any spec.md?"
+```bash
+nexspec trace REQ-001     # empty result → requirement with no implementation (REQ projects only)
+nexspec diff --staged     # changed symbols + direct dependants → do their REQs still hold?
 ```
 
 Report findings. Never auto-modify spec files.
@@ -100,11 +76,11 @@ Report findings. Never auto-modify spec files.
 ```
 DRIFT REPORT
 ============
-Graph: stale (14 files newer than graph.json) → propose: graphify . --update
+Index: synced (added=2 modified=5 deleted=1 dirty=3)
 STATE.md: 3 commits not reflected → propose: update Progress section
 Spec drift: none detected
 
-Apply proposed fixes? [y/n]
+Apply remaining proposed fixes? [y/n]
 ```
 
 Always wait for user confirmation before applying any fix.

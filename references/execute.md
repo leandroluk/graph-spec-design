@@ -10,7 +10,7 @@ For ≤3 files with a one-sentence scope:
 2. Implement
 3. Run gate check
 4. Atomic commit: `git commit -m "type(scope): description [REQ-001]"`
-   → post-commit hook runs `graphify --update` in background
+   → post-commit hook runs `nexspec sync` in background
 5. Update STATE.md Progress section
 
 ## Sub-agent mode (Large/Complex scope)
@@ -52,30 +52,34 @@ Types: feat | fix | refactor | test | docs | chore
 Scope: module or feature slug
 ```
 
-## Graph update after execute
+## Traceability (when `Traceability: on`)
 
-If commits were made → the post-commit hook handles `graphify --update` automatically.
+- Put a comment immediately above each function/method/type that implements a
+  requirement: `// @spec REQ-001` (use the language's comment syntax; `@adr ADR-001`
+  for decisions). It must be the comment directly preceding the symbol, and the ID
+  must exist in a spec — nexspec ignores unknown IDs.
+- Commit messages carry `[REQ-NNN]` (already in the format below).
+- Skip for pure refactors/chores with no requirement.
 
-If edits are uncommitted (WIP), run manually — detect OS first:
+## Impact check & index update
 
-**PowerShell (Windows):**
-```powershell
-$env:GRAPHIFY_OUT = ".specs/graph"
-$py = Get-Content .specs/graph/.graphify_python
-& $py -m graphify . --update --no-viz
-```
+Before committing, see what the change touches structurally:
 
-**bash (macOS/Linux):**
 ```bash
-export GRAPHIFY_OUT=".specs/graph"
-py=$(cat .specs/graph/.graphify_python)
-"$py" -m graphify . --update --no-viz
+nexspec diff --staged     # symbols changed in the dirty/staged tree + direct dependants
 ```
+
+Dependants outside the task's scope → verify them (or add them to the gate) before
+marking the task complete. To understand why a symbol looks the way it does:
+`nexspec blame <symbol>` (AST-scoped, cheaper than reading `git log -p`).
+
+If commits were made → the post-commit hook runs `nexspec sync` automatically.
+For uncommitted edits (WIP) run `nexspec sync` manually.
 
 ## STATE.md update
 
 ```markdown
-## Progress
-- [ISO date] T-001 complete. Gate: 42/42 pass. Commit: abc1234. [REQ-001]
-- [ISO date] T-002 SPEC_DEVIATION: [description]. Gate: 38/42. Commit: def5678.
+## Recent Progress (Last 10)
+- [ISO date] TASK-001 complete. Gate: 42/42 pass. Commit: abc1234. [REQ-001]
+- [ISO date] TASK-002 SPEC_DEVIATION: [description]. Gate: 38/42. Commit: def5678.
 ```

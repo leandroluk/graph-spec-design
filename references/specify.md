@@ -2,22 +2,26 @@
 
 **Trigger:** "specify feature", "define requirements", "new feature", "what should X do"
 
-Before writing any requirement, query the graph to understand the existing landscape.
+Before writing any requirement, query the index to understand the existing landscape.
 
-## 1.1 — Graph-guided discovery
+## 1.1 — Index-guided discovery
 
 ```
-graphify query "What existing modules are related to [feature area]?"
-graphify path "EntryPoint" "ExpectedOutput"
-graphify explain "CentralComponent"
+nexspec search "[feature area]" --max-tokens 2000   # related modules, budgeted
+nexspec trace "CentralComponent"                    # what it connects to
 ```
 
 Use the results to:
 - Identify components the feature will touch (list them in spec.md)
-- Flag God Nodes that the feature must interact with (high-risk — note in spec)
+- Flag high-risk components (wide `trace` fan-out) the feature must interact with — note in spec
 - Avoid duplicating existing functionality
 
 ## 1.2 — Create spec.md
+
+Read `Traceability:` from `.specs/project/PROJECT.md`. When `on` (default), every
+requirement gets a stable `REQ-NNN` ID as a list item (`- REQ-001: ...`) — that exact
+shape is what nexspec indexes. Never renumber existing IDs. When `off`, write plain
+bullets.
 
 Path: `.specs/features/[feature-slug]/spec.md`
 
@@ -34,7 +38,7 @@ One paragraph describing what this feature does and why.
 
 ## Affected Components (from graph)
 - `NodeId_A` — [role in this feature]
-- `NodeId_B → NodeId_C` — [call path identified via `graphify path`]
+- `NodeId_B → NodeId_C` — [call path identified via `nexspec trace`]
 - `NodeId_X` ⚠️ God Node (degree N) — changes here have wide impact
 
 ## Out of Scope
@@ -59,8 +63,8 @@ without user input, enter discuss mode:
 
 ```markdown
 ## Decisions
-- [ISO date] Feature "[name]" specified. Affects communities: [from GRAPH_REPORT].
-  REQ count: N. Graph queried: [yes/no].
+- [ISO date] Feature "[name]" specified. Affects modules: [from nexspec search].
+  REQ count: N. Index queried: [yes/no].
 
 ## Todos
 - [ ] Design phase for [feature name]
@@ -68,6 +72,6 @@ without user input, enter discuss mode:
 
 ## 1.5 — After saving spec.md
 
-The post-commit hook will run `graphify --update` automatically on the next commit,
+The post-commit hook will run `nexspec sync` automatically on the next commit,
 indexing REQ-001 etc. as graph nodes connected to the code that implements them.
 No manual action needed.

@@ -1,24 +1,31 @@
-# Phase 0 — Init & Graph Build
+# Phase 0 — Init & Index Build
 
-Run this phase when `.specs/graph/graph.json` does not exist, or when the user
-explicitly asks to "initialize project" or "map codebase".
+Run this phase when `.specs/.index/` does not exist, or when the user explicitly
+asks to "initialize project" or "map codebase".
 
-## 0.1 — Detect OS and shell
+`nexspec` is a single static binary: no Python interpreter to detect, no environment
+variable to set, and no OS-specific branches — the same commands work on every OS.
 
-Before running any command, detect the operating system:
+---
 
+## 0.1 — Verify the binary
+
+```bash
+nexspec --version
 ```
-IF Windows  → use PowerShell commands (pwsh / powershell)
-IF macOS    → use bash/zsh commands
-IF Linux    → use bash commands
+
+If missing, install (requires a Rust toolchain):
+
+```bash
+cargo install --git https://github.com/leandroluk/rust-nexspec nexspec
+# BM25-only build, without the ONNX/HNSW vector engine:
+cargo install --git https://github.com/leandroluk/rust-nexspec nexspec --no-default-features --features lean
 ```
 
-Detection (the agent reads the environment, not the user):
-- Windows: `$env:OS -eq "Windows_NT"` or `[System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)`
-- macOS/Linux: `uname -s` returns `Darwin` or `Linux`
+If that fails or is declined → degraded mode (section 0.6).
 
-All commands below are shown in **PowerShell** (Windows) and **bash** (macOS/Linux) variants.
-The agent selects the correct one automatically based on the detected OS.
+The default `full` build also uses an embedding model (`all-MiniLM-L6-v2`, INT8, in
+`.models/`) for semantic search. Without it, search degrades to BM25 — it never fails.
 
 ---
 
@@ -27,133 +34,91 @@ The agent selects the correct one automatically based on the detected OS.
 **PowerShell (Windows):**
 ```powershell
 New-Item -ItemType Directory -Force -Path `
-  .specs/project, .specs/codebase, .specs/features, .specs/quick, .specs/graph | Out-Null
+  .specs/project, .specs/codebase, .specs/features, .specs/quick | Out-Null
 ```
 
 **bash (macOS/Linux):**
 ```bash
-mkdir -p .specs/project .specs/codebase .specs/features .specs/quick .specs/graph
+mkdir -p .specs/project .specs/codebase .specs/features .specs/quick
+```
+
+Ensure `.specs/.index/` is git-ignored (append it to `.gitignore` if missing). The existing file may not end with a newline — add one first, or the entry gets glued to the last line and silently ignores nothing:
+
+```bash
+grep -qxF '.specs/.index' .gitignore || { [ -n "$(tail -c1 .gitignore)" ] && echo >> .gitignore; echo '.specs/.index' >> .gitignore; }
 ```
 
 ---
 
-## 0.3 — Set GRAPHIFY_OUT and build the graph
+## 0.2b — Ask about requirement traceability (once)
 
-All graphify invocations MUST set `GRAPHIFY_OUT` so artifacts land in `.specs/graph/`
-instead of the default `graphify-out/` at the project root.
+Ask the user (in their language):
 
-> Running on `.` (repo root) makes graphify process **source code** (AST) AND
-> **`.specs/*.md`** (semantic). This connects `REQ-001` in `spec.md` to the modules
-> that implement it — enabling `graphify query "what implements REQ-001?"` to return
-> exact file+function references.
+> Use requirement traceability? Specs get `REQ-001`-style IDs, code gets `@spec REQ-001`
+> comments and commits carry `[REQ-001]`, so `nexspec trace REQ-001` answers "what
+> implements this?" and drift/impact checks can find unimplemented or orphaned
+> requirements. Costs a few tokens per spec/commit, saves far more per query.
+> **Recommended: yes.**
 
-**PowerShell (Windows):**
-```powershell
-$env:GRAPHIFY_OUT = ".specs/graph"
+Record the answer in `.specs/project/PROJECT.md` as `Traceability: on` (default if the
+user has no preference) or `Traceability: off`. Every later phase reads this flag; when
+`off`, skip all REQ/`@spec` steps and use symbol-based `search`/`trace` only. Never re-ask.
 
-# Detect graphify Python interpreter (uv → pipx → active env)
-$py = $null
-if (Get-Command uv -ErrorAction SilentlyContinue) {
-    $uvDir = (uv tool dir 2>$null).Trim()
-    $candidate = Join-Path $uvDir "graphifyy\Scripts\python.exe"
-    if ((Test-Path $candidate) -and (& $candidate -c "import graphify" 2>$null; $LASTEXITCODE -eq 0)) {
-        $py = $candidate
-    }
-}
-if (-not $py) {
-    $pyCmd = (Get-Command python -ErrorAction SilentlyContinue)?.Source
-    if ($pyCmd -and (& $pyCmd -c "import graphify" 2>$null; $LASTEXITCODE -eq 0)) {
-        $py = $pyCmd
-    }
-}
-if (-not $py) {
-    Write-Error "graphify not found. Install: uv tool install graphifyy"
-    exit 0  # degraded mode — see section 0.6
-}
+For a project that already has specs, default to `on` only if they already contain
+`REQ-` IDs; otherwise ask.
 
-# Save interpreter path for future use (commit hook, --update calls)
-$py | Out-File -FilePath .specs/graph/.graphify_python -Encoding utf8 -NoNewline
+---
 
-& $py -m graphify .
+## 0.3 — Build the index
+
+```bash
+nexspec init     # creates .specs/.index/ (idempotent)
+nexspec sync     # indexes code (Tree-sitter) + .specs/*.md (REQ/TASK/ADR markers)
 ```
 
-**bash (macOS/Linux):**
-```bash
-export GRAPHIFY_OUT=".specs/graph"
+> The index covers **source code** (TS/JS, Python, Go, Rust) AND **`.specs/*.md`** in
+> one graph. Symbol search/trace work with no markers at all. With traceability on (0.2b),
+> `REQ-XXX`/`TASK-XXX`/`ADR-XXX` markers in specs, `@spec` code comments and commit
+> messages become linked nodes, and `nexspec trace REQ-001` returns exact
+> file+symbol references.
 
-# Detect graphify Python interpreter (uv → pipx → active env)
-py=""
-if command -v uv &>/dev/null; then
-    uv_dir=$(uv tool dir 2>/dev/null)
-    candidate="$uv_dir/graphifyy/bin/python"
-    if [ -f "$candidate" ] && "$candidate" -c "import graphify" &>/dev/null; then
-        py="$candidate"
-    fi
-fi
-if [ -z "$py" ] && command -v python &>/dev/null; then
-    if python -c "import graphify" &>/dev/null; then
-        py=$(python -c "import sys; print(sys.executable)")
-    fi
-fi
-if [ -z "$py" ]; then
-    echo "graphify not found. Install: uv tool install graphifyy" >&2
-    exit 0  # degraded mode — see section 0.6
-fi
+`nexspec` syncs from **Git history**, so the project must be a Git repository.
 
-# Save interpreter path for future use (commit hook, --update calls)
-echo -n "$py" > .specs/graph/.graphify_python
+Optional — register the MCP server so the agent gets `query_context`,
+`trace_requirement`, `find_impacted_code`, `get_symbol_history` and `sync_workspace`
+as native tools:
 
-"$py" -m graphify .
+```json
+{ "mcpServers": { "nexspec": { "command": "nexspec", "args": ["--repo", ".", "mcp"] } } }
 ```
 
 ---
 
 ## 0.4 — Install post-commit hook (git projects only)
 
-**PowerShell (Windows):**
-```powershell
-if (Test-Path .git) {
-    New-Item -ItemType Directory -Force -Path .git/hooks | Out-Null
-    @"
-#!/bin/sh
-# graph-spec-design: update knowledge graph after every commit
-export GRAPHIFY_OUT=".specs/graph"
-PY=`$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
-"`$PY" -m graphify . --update --no-viz > /dev/null 2>&1 &
-"@ | Out-File -FilePath .git/hooks/post-commit -Encoding utf8 -NoNewline
-    Write-Host "Hook installed: graphify --update will run after every commit."
-} else {
-    Write-Host "No .git found — hook skipped. See section 0.6 for manual sync."
-}
+```bash
+mkdir -p .git/hooks
+printf '#!/bin/sh\n# graph-spec-design: refresh the NexSpec index after every commit\nnexspec sync > /dev/null 2>&1 &\n' > .git/hooks/post-commit
+chmod +x .git/hooks/post-commit
 ```
 
-**bash (macOS/Linux):**
-```bash
-if [ -d .git ]; then
-    mkdir -p .git/hooks
-    cat > .git/hooks/post-commit << 'EOF'
-#!/bin/sh
-# graph-spec-design: update knowledge graph after every commit
-export GRAPHIFY_OUT=".specs/graph"
-PY=$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
-"$PY" -m graphify . --update --no-viz > /dev/null 2>&1 &
-EOF
-    chmod +x .git/hooks/post-commit
-    echo "Hook installed: graphify --update will run after every commit."
-else
-    echo "No .git found — hook skipped. See section 0.6 for manual sync."
-fi
-```
+On Windows, run this in Git Bash (git executes hooks through its bundled `sh`).
+If a `post-commit` hook already exists, append the `nexspec sync` line instead of overwriting.
 
 ---
 
-## 0.5 — Read GRAPH_REPORT.md and seed codebase docs
+## 0.5 — Seed codebase docs
 
-After the build, read `.specs/graph/GRAPH_REPORT.md` and use its output to:
+There is no generated report to read. Seed `.specs/codebase/` with targeted, budgeted
+queries instead of walking the tree:
 
-- **God Nodes** section → seed `.specs/codebase/CONCERNS.md` with high-risk components
-- **Community Hubs** section → seed `.specs/codebase/ARCHITECTURE.md` with module groupings
-- **Token cost** → record in `.specs/project/STATE.md` under `## Cost`
+```bash
+nexspec search "entry point main architecture modules" --max-tokens 2000   # → ARCHITECTURE.md
+nexspec search "error handling retry fallback risk" --max-tokens 1500      # → CONCERNS.md
+```
+
+Read at most the 2–3 files the results point to. Record the first `nexspec sync`
+summary line (added/modified counts) in `.specs/project/STATE.md` under `## Cost`.
 
 ---
 
@@ -173,25 +138,32 @@ $sizeKB = [math]::Round((Get-Item .specs/project/STATE.md -ErrorAction SilentlyC
 ```bash
 state_content=$(cat .specs/project/STATE.md 2>/dev/null || echo "")
 is_legacy=$(echo "$state_content" | grep -c "^## Progress\|^## Decisions")
-size_kb=$(du -k .specs/project/STATE.md 2>/dev/null | cut -f1 || echo 0)
+size_bytes=$(wc -c < .specs/project/STATE.md 2>/dev/null || echo 0)   # bytes, not du -k (block-rounded)
 ```
 
-If the file is legacy OR if `$sizeKB > 30`:
+If the file is legacy OR if `$sizeKB > 30` (bash: `$size_bytes -gt 30720`):
 - Run the compaction protocol: [references/state_compaction.md](state_compaction.md)
 - The protocol will migrate legacy section names to windowed names and archive the overflow
 - Report to user: `STATE.md migrated to windowed format: <before> KB → <after> KB`
 
+## 0.5c — Migrating from graphify
+
+If `.specs/graph/` exists from a previous graphify-based install: delete it (it is
+generated), remove any `GRAPHIFY_OUT` / `.graphify_python` lines from
+`.git/hooks/post-commit` (0.4 replaces the hook), and continue at 0.3.
+
 ---
 
-## 0.6 — Degraded mode (graphify unavailable)
+## 0.6 — Degraded mode (nexspec unavailable)
 
-If graphify cannot be installed (no Python, restricted environment, user declined):
+If nexspec cannot be installed (no Rust toolchain, no Git repo, restricted
+environment, user declined):
 
 - Skip steps 0.3–0.5
 - Record in `.specs/project/STATE.md`:
   ```markdown
   ## Degraded Mode
-  - graphify not available. All context loaded from raw files.
+  - nexspec not available. All context loaded from raw files.
   - Token budget: load only the active feature spec + STATE.md per session.
   ```
 - Continue with spec-driven flow using direct file reads — no phase is ever blocked.

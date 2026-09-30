@@ -31,8 +31,8 @@ if ($sizeKB -gt 30) { # run compaction }
 **bash (macOS/Linux):**
 ```bash
 state_file=".specs/project/STATE.md"
-size_kb=$(du -k "$state_file" | cut -f1)
-if [ "$size_kb" -gt 30 ]; then # run compaction; fi
+size_bytes=$(wc -c < "$state_file")   # bytes, not du -k (block-rounded)
+if [ "$size_bytes" -gt 30720 ]; then # run compaction; fi
 ```
 
 ---
@@ -125,7 +125,7 @@ Last synced commit: <sha>
 - [YYYY-MM-DD] <decision>
 
 ## Recent Progress (Last 10)
-- [YYYY-MM-DD] <feature> T-00N complete. Gate: N/N pass. Commit: <sha>.
+- [YYYY-MM-DD] <feature> TASK-00N complete. Gate: N/N pass. Commit: <sha>.
 
 ## Lessons Learned (Last 5)
 - [YYYY-MM-DD] <lesson>

@@ -8,27 +8,29 @@
 
 Path: `.specs/features/[feature-slug]/tasks.md`
 
+Task IDs use the `TASK-NNN` form — nexspec indexes `### TASK-NNN` headings and links them to the `REQ-NNN` in their body.
+
 Each task must be atomic — completable in one sub-agent call with a verifiable outcome.
 
 ```markdown
 # Tasks: [Feature Name]
 
-## T-001: [Title]
-- **REQ**: REQ-001
-- **Graph node**: NodeA
+### TASK-001: [Title]
+- **REQ**: REQ-001   <!-- omit when traceability is off -->
+- **Symbols**: NodeA
 - **What**: [precise description of the change]
 - **Where**: [file(s) to create or modify]
-- **Depends on**: none (or T-00N)
+- **Depends on**: none (or TASK-00N)
 - **[P]**: (mark if parallelizable with another task — same tag = same wave)
 - **Done when**: [verifiable criterion — not "it works", but "test X passes" or "endpoint returns Y"]
 - **Gate**: `[test command to run]`
 
-## T-002: [Title]
+### TASK-002: [Title]
 - **REQ**: REQ-002
-- **Graph node**: NodeB → NodeC
+- **Symbols**: NodeB → NodeC
 - **What**: ...
 - **Where**: ...
-- **Depends on**: T-001
+- **Depends on**: TASK-001
 - **Done when**: ...
 - **Gate**: `[command]`
 ```
@@ -50,7 +52,7 @@ with user whether to split the feature, then revise scope before continuing.
 
 ```markdown
 ## Todos
-- [ ] T-001: [title] — Execute phase
-- [ ] T-002: [title] — Execute phase
-- [ ] T-003: [title] — Execute phase [P]
+- [ ] TASK-001: [title] — Execute phase
+- [ ] TASK-002: [title] — Execute phase
+- [ ] TASK-003: [title] — Execute phase [P]
 ```

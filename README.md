@@ -1,9 +1,9 @@
 # graph-spec-design
 
-> Spec-driven AI coding workflow + Graphify GraphRAG = persistent knowledge graph as a token-efficient context index.
+> Spec-driven AI coding workflow + NexSpec (Rust) = persistent code+spec graph as a token-efficient context index.
 
 [![License: CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](SKILL.md)
 [![Works with](https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20Cursor%20%7C%20Gemini%20CLI%20%7C%20Copilot-orange.svg)](#compatibility)
 
 ---
@@ -15,7 +15,7 @@
 | Tool                | What it brings                                                                                              |
 | ------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **tlc-spec-driven** | Spec-driven pipeline: Specify → Design → Tasks → Execute with persistent `.specs/` memory                   |
-| **graphify**        | Knowledge graph (GraphRAG) built from code + specs, queryable at ~1–3k tokens instead of loading full files |
+| **[nexspec](https://github.com/leandroluk/rust-nexspec)** | Rust context engine: code + specs in one graph, hybrid search, token-budgeted output, native Git. Replaces `graphify` |
 
 The result: you get structured planning discipline **and** token-cheap context traversal in a single, unified `.specs/` directory.
 
@@ -23,9 +23,9 @@ The result: you get structured planning discipline **and** token-cheap context t
 
 ```
 .specs/features/auth/spec.md   ← source of truth (editable, git-tracked)
-         ↓  graphify extracts semantically
-graph.json: node "REQ-001"     ← connected to JwtModule, AuthService, UserRepository
-         ↓  graphify query
+         ↓  nexspec sync (Tree-sitter + Markdown markers)
+.specs/.index: node "REQ-001"  ← connected to JwtModule, AuthService, UserRepository
+         ↓  nexspec trace REQ-001
 "What implements REQ-001?"     → returns exact files and functions (~1k tokens)
 ```
 
@@ -60,15 +60,17 @@ cd your-project/.agents/skills
 git clone https://github.com/leandroluk/graph-spec-design
 ```
 
-### Requires graphify
+### Requires nexspec
 
 ```bash
-uv tool install graphifyy   # recommended
-# or
-pip install graphifyy
+cargo install --git https://github.com/leandroluk/rust-nexspec nexspec
+# BM25-only, no ONNX/HNSW vector engine:
+cargo install --git https://github.com/leandroluk/rust-nexspec nexspec --no-default-features --features lean
 ```
 
-> **Note:** the PyPI package is `graphifyy` (two y's). The CLI command is `graphify` (one y).
+A single static binary — no Python, no `uv`, no environment variables. The skill installs it automatically on first use when a Rust toolchain is present, and falls back to degraded mode (direct file reads) otherwise.
+
+> **Migrating from v2 (graphify):** delete `.specs/graph/`; `nexspec init && nexspec sync` builds the new index in `.specs/.index/` (git-ignored). The old `graph-spec-design` Python wrapper was removed.
 
 ---
 
@@ -84,14 +86,14 @@ Everything lives in `.specs/`:
 ├── codebase/           # STACK, ARCHITECTURE, CONVENTIONS, CONCERNS, TESTING
 ├── features/[name]/    # spec.md, design.md?, tasks.md?
 ├── quick/NNN-slug/     # quick fixes
-└── graph/              # Graphify output — graph.json, GRAPH_REPORT.md, graph.html
+└── .index/             # nexspec index (generated, git-ignored)
 ```
 
 ### Session start (every session)
 
 1. Read `.specs/project/STATE.md` — restores memory from last session
-2. Check if `graph.json` is stale → if yes, run `graphify . --update --no-viz`
-3. Answer all code questions via `graphify query` / `path` / `explain` — not raw file reads
+2. Run `nexspec sync` (incremental, idempotent — no staleness heuristics)
+3. Answer code questions via `nexspec search --max-tokens N` / `trace` / `diff --staged` — not raw file reads
 
 ### Three hard guarantees
 

@@ -22,7 +22,7 @@ After loading STATE.md and HANDOFF.md, summarize in 3–5 lines:
 Resuming: [feature name], phase [Specify/Design/Tasks/Execute]
 Last completed: [last entry in STATE.md Progress]
 Next step: [from HANDOFF.md or STATE.md Todos]
-Graph: [fresh / stale — N files newer]
+Index: [nexspec sync summary]
 Proceed? [or describe what you want to work on]
 ```
 
@@ -44,7 +44,7 @@ Append to the relevant sections using the windowed structure:
 
 ```markdown
 ## Recent Progress (Last 10)
-- [ISO date] [feature] T-00N complete. Gate: N/N pass. Commit: [sha].
+- [ISO date] [feature] TASK-00N complete. Gate: N/N pass. Commit: [sha].
 
 ## Recent Decisions (Last 15)
 - [ISO date] [decision made this session]
@@ -68,8 +68,8 @@ if ($sizeKB -gt 30) { Write-Host "STATE.md at $sizeKB KB — running compaction.
 
 **bash (macOS/Linux):**
 ```bash
-size_kb=$(du -k .specs/project/STATE.md | cut -f1)
-if [ "$size_kb" -gt 30 ]; then echo "STATE.md at ${size_kb}KB — running compaction..."; fi
+size_bytes=$(wc -c < .specs/project/STATE.md)   # bytes, not du -k (block-rounded)
+if [ "$size_bytes" -gt 30720 ]; then echo "STATE.md at ${size_bytes}B — running compaction..."; fi
 ```
 
 If exceeded → run [state_compaction.md](state_compaction.md) protocol before step 3.
@@ -91,44 +91,29 @@ If exceeded → run [state_compaction.md](state_compaction.md) protocol before s
 ## Next Step
 [exact first thing to do when resuming — be specific enough that no STATE.md read is needed to know where to start]
 
-## Graph Status
-[fresh / stale — last updated: ISO date]
+## Index Status
+[nexspec sync output — last run: ISO date]
 
 ## Open Questions
 [anything unresolved that needs user input]
 ```
 
-### 3. Update the graph
+### 4. Refresh the index
 
-If commits were made, the post-commit hook already handled it. For uncommitted edits (WIP):
+The post-commit hook covers commits. For uncommitted edits (WIP), sync manually
+(it includes the dirty tree):
 
-**PowerShell (Windows):**
-```powershell
-$dirty = git status --porcelain 2>$null
-if ($dirty) {
-    $env:GRAPHIFY_OUT = ".specs/graph"
-    $py = Get-Content .specs/graph/.graphify_python -ErrorAction SilentlyContinue
-    if ($py) { & $py -m graphify . --update --no-viz }
-}
-```
-
-**bash (macOS/Linux):**
 ```bash
-dirty=$(git status --porcelain 2>/dev/null)
-if [ -n "$dirty" ]; then
-    export GRAPHIFY_OUT=".specs/graph"
-    py=$(cat .specs/graph/.graphify_python 2>/dev/null || echo "python")
-    "$py" -m graphify . --update --no-viz
-fi
+nexspec sync
 ```
 
-### 4. Confirm to user
+### 5. Confirm to user
 
 ```
 Session paused.
 STATE.md updated ✓
 HANDOFF.md written ✓
-Graph: [updated / already fresh]
+Index: [synced / nothing to sync]
 
 Resume with: "resume work" or "continue [feature name]"
 ```

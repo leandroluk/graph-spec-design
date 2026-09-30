@@ -20,7 +20,8 @@ Use the results to:
 
 Read `Traceability:` from `.specs/project/PROJECT.md`. When `on` (default), every
 requirement gets a stable `REQ-NNN` ID as a list item (`- REQ-001: ...`) — that exact
-shape is what nexspec indexes. Never renumber existing IDs. When `off`, write plain
+shape is what nexspec indexes. IDs may carry a feature prefix (`REQ-CTR-001`) — recommended, since
+ids are global across the project. Never renumber existing IDs. When `off`, write plain
 bullets.
 
 Path: `.specs/features/[feature-slug]/spec.md`

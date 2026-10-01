@@ -4,7 +4,7 @@ description: "Use when starting a work session, initializing or mapping a projec
 license: CC-BY-4.0
 metadata:
   author: leandroluk
-  version: 3.0.0
+  version: 3.1.0
 ---
 
 # Graph-Spec-Design
@@ -43,15 +43,55 @@ At the start of EVERY session, before anything else:
 2. **Read `.specs/project/STATE.md`** (persistent memory — hot state only).
    - Never read `STATE_ARCHIVE.md` unless the user explicitly asks for history.
 3. If `.specs/.index/` exists (NexSpec index):
-   - **Refresh** with `nexspec sync`. It is incremental, idempotent and cheap (Git tree
-     diff + dirty tree), so there is no mtime comparison and no "is it stale?" reasoning —
-     just run it. Deletes and renames are handled natively; a full rebuild is never needed
-     (if the index is ever corrupted: `nexspec sync --resume`, then delete `.specs/.index/`
-     and run `nexspec init && nexspec sync`).
-   - Answer codebase questions with `nexspec search "<q>" --max-tokens 2000` (ranked,
-     signature-pruned, budgeted Markdown) and `nexspec trace <symbol>` (or `<REQ-ID>` when `Traceability: on`) instead of
-     reading raw source files (20–50k tokens).
-     **CRITICAL HEURISTIC:** For behavioral, business logic, or detailed implementation questions, use `search` only to locate the 2-3 relevant files, then read them directly. `search`/`trace` are for locating and for structural/topological questions ("what depends on Y?", "where is X defined?", "what implements REQ-001?" when traceability is on).
+   - **Refresh** with `nexspec sync` (or `nexspec check-update` first: read-only, ~0.1 s;
+     exit 0 = fresh, 3 = stale → run `sync`, 4 = no index → Phase 0). Sync is incremental,
+     idempotent and cheap (Git tree diff + dirty tree; ~2 s for 1.3k files cold), so there is
+     no mtime comparison — just run it. Deletes and renames are handled natively; a full rebuild is never needed
+     (if the index is ever corrupted: `nexspec sync --resume`, then `nexspec doctor`; last
+     resort delete `.specs/.index/` and run `nexspec init && nexspec sync`).
+   - Answer codebase questions with the graph commands instead of reading raw source
+     files (20–50k tokens). All accept `--max-tokens`:
+
+     | Question | Command |
+     | --- | --- |
+     | free-form ("how does X work", "what relates to Y") | `nexspec query "<q>" --max-tokens 2000` |
+     | what is X (location, signature, links, authors) | `nexspec explain <X>` |
+     | who depends on X (transitively, by file) | `nexspec affected <X> [--depth N]` |
+     | how are A and B connected | `nexspec path <A> <B>` |
+     | dependency tree of a symbol / `REQ-ID` | `nexspec trace <X>` |
+     | ranked lookup, signature-pruned Markdown | `nexspec search "<q>" --max-tokens 2000` |
+     | structure: God nodes, communities, cycles, requirement coverage | `nexspec report --max-tokens 3000` |
+     | what my uncommitted change touches | `nexspec diff --staged` |
+     | history of a symbol | `nexspec blame <symbol>` |
+
+     Use exact identifiers (class/function names, `REQ-…`) — they resolve directly; vague
+     prose falls back to BM25 and may return only files (`nexspec enrich`, below, improves
+     prose questions). Add `--no-enrich` / `--no-memory` to see the raw ranking.
+   - **Work memory** (`.specs/.memory/`, local): after answering a codebase question, record how
+     it went so later sessions rank better:
+     `nexspec save-result --question "<q>" --outcome useful|dead_end|corrected --nodes <X> [<Y>…]`
+     (`corrected` also needs `--correction "<right answer>"`; no secrets in any field).
+     At session start `nexspec reflect --max-tokens 800` prints the short lessons summary
+     (read-only); a plain `nexspec reflect` rewrites `LESSONS.md` and the ranking nudge.
+     With MCP these are the `save_result` and `reflect` tools.
+   - **Annotations**: when exploration reaches a durable conclusion about a node or module,
+     persist it: `nexspec annotate <X> --note "<≤500 chars>" [--relation depends_on --to <Y>]`
+     (or `community:<n> --label "<name>"` to name a community). Annotations are marked
+     `fresh`/`stale`/`dangling` as code moves; `nexspec annotate lint` (exit 8 = findings)
+     before committing `annotations.jsonl`. MCP: `annotate_node`.
+   - **Optional, opt-in** (ask the user first; neither runs by default):
+     `nexspec enrich` — LLM summary per file (Gemini; needs `GEMINI_API_KEY`, **sends code
+     snippets to an external API**, secrets masked as `[REDACTED]`, `--omit-secrets` keeps
+     flagged files home; `--dry-run` shows the plan and cost, `--status` the state). Raises
+     recall on prose questions; cached in `.specs/.cache/`.
+     `nexspec sync --embed [--similar]` — real embeddings / `SimilarTo` edges (no clear gain measured).
+   - **Other views**: `nexspec export --format json|html|tree|wiki` (`--check` exits 7 if the
+     committed export is stale); multi-repo: `nexspec global add|list|remove` then
+     `--global` on `query/path/explain/affected`.
+   - **Exit codes**: 0 ok · 1 error · 2 import cycle (`report --fail-on-cycle`) · 3 stale /
+     4 no index (`check-update`) · 5 `doctor` failure · 6 `enrich` partial failure ·
+     7 `export --check` stale · 8 `annotate lint` findings.
+     **CRITICAL HEURISTIC:** For behavioral, business logic, or detailed implementation questions, use `search` only to locate the 2-3 relevant files, then read them directly. The graph commands are for locating and for structural/topological questions ("what depends on Y?", "where is X defined?", "what implements REQ-001?" when traceability is on).
 4. If `.specs/.index/` does not exist → run Phase 0 ([references/init.md](references/init.md)).
 5. If `nexspec` is not installed → install it automatically (requires a Rust toolchain):
    ```
@@ -118,7 +158,7 @@ Load ONLY the reference for the active phase:
 | (automatic at session start / pre-Specify)   | [references/drift.md](references/drift.md)     |
 | STATE.md > 30 KB (automatic)                 | [references/state_compaction.md](references/state_compaction.md) |
 | show state history, archived decisions       | `STATE_ARCHIVE.md` — read on demand only       |
-| how does X work, what calls Y, trace, impact | `nexspec search` / `trace` / `diff --staged` / `blame` directly |
+| how does X work, what calls Y, trace, impact | `nexspec query` / `explain` / `affected` / `path` / `trace` / `diff --staged` / `blame` directly |
 
 ## Context Budget
 

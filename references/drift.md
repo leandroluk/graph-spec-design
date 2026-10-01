@@ -17,7 +17,8 @@ No mtime comparison is needed: `nexspec sync` diffs Git trees plus the dirty wor
 tree, so it is the freshness check and the fix in one cheap command.
 
 ```bash
-nexspec sync    # prints: added=N modified=N deleted=N dirty=N
+nexspec check-update   # read-only: "up-to-date" | "stale: <reason>" | "no-index" (exit 0 / 3 / 4)
+nexspec sync           # prints: added=N modified=N deleted=N dirty=N
 ```
 
 If it fails with `Database already open. Cannot acquire lock`, the post-commit hook's background sync is
@@ -64,12 +65,13 @@ fi
 
 ### 3. Spec vs implementation divergence (before Design/Implement)
 
-Run the `trace` line only when `Traceability: on` in `.specs/project/PROJECT.md`. Otherwise trace each active REQ-ID to confirm it still
-reaches code, and check that uncommitted work still maps to a spec:
+Run the requirement checks only when `Traceability: on` in `.specs/project/PROJECT.md`:
 
 ```bash
-nexspec trace REQ-001     # empty result → requirement with no implementation (REQ projects only)
-nexspec diff --staged     # changed symbols + direct dependants → do their REQs still hold?
+nexspec report --format md --max-tokens 1500   # read "Requirement Coverage": requirements with
+                                               # no code/task, tasks with no REQ, @spec → missing REQ
+nexspec trace REQ-001                          # drill into one requirement
+nexspec diff --staged                          # changed symbols + dependants → do their REQs still hold?
 ```
 
 Report findings. Never auto-modify spec files.

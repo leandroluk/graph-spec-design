@@ -9,18 +9,26 @@
 Before writing any architecture, trace the actual structural paths:
 
 ```
-nexspec trace "ComponentThatWillChange"                 # what it depends on / is defined in
-nexspec trace REQ-001                                   # only if the specs use REQ markers
-nexspec search "[ComponentName] usage" --max-tokens 2000  # budgeted context on callers
+nexspec explain "ComponentThatWillChange"               # location, signature, links, authors
+nexspec affected "ComponentThatWillChange" --depth 2    # who depends on it, grouped by file
+nexspec path "EntryPoint" "ExitPoint"                   # shortest chain between two nodes
+nexspec trace REQ-001                                   # only when Traceability: on
 ```
 
 Record the paths found — they become the backbone of the design.
 
 ## 2.2 — Risk check
 
-`nexspec` has no generated report; derive risk from targeted queries:
+```bash
+nexspec report --max-tokens 3000
+```
 
-- **High change radius** — `nexspec trace <symbol>` with many hops/dependants → document explicitly
+Read and check:
+
+- **God Nodes** the feature must touch — high degree/dependants, document explicitly
+- **Low-cohesion communities** (< 0.3 = fragile) and **Surprising Connections** → surprises
+- **Import Cycles** near the feature
+- **High change radius** — `nexspec affected <symbol>` → document explicitly
 - **Fragile history** — `nexspec blame <symbol>` (many authors/hunks, wide co-change list) → note the co-changing files
 - **Existing concerns** — check `.specs/codebase/CONCERNS.md`
 

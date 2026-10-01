@@ -9,9 +9,11 @@ On every session start, in this exact order:
    - Active feature and current phase
    - Open decisions and blockers
    - Next planned step
-3. **Read `.specs/HANDOFF.md`** if it exists — ephemeral resumption pointer written
+3. **Load work memory** (if `.specs/.memory/` exists): `nexspec reflect --max-tokens 800`
+   — read-only lessons from past questions (what helped, dead ends, corrections).
+4. **Read `.specs/HANDOFF.md`** if it exists — ephemeral resumption pointer written
    at session end. Delete after reading (it's one-shot).
-4. **Load feature context on demand** — only read the active feature's spec/design/tasks
+5. **Load feature context on demand** — only read the active feature's spec/design/tasks
    when actually starting work on it. Do not preload all specs.
 
 ### Resume prompt to user
@@ -98,7 +100,15 @@ If exceeded → run [state_compaction.md](state_compaction.md) protocol before s
 [anything unresolved that needs user input]
 ```
 
-### 4. Refresh the index
+### 4. Persist what was learned
+
+- Record the questions that mattered:
+  `nexspec save-result --question "<q>" --outcome useful|dead_end|corrected --nodes <X>`
+- Persist durable conclusions about code: `nexspec annotate <X> --note "<short>"`, then
+  `nexspec annotate lint` (exit 8 = stale/dangling/duplicate findings to fix first).
+- `nexspec reflect` rewrites `.specs/.memory/LESSONS.md` from the saved results.
+
+### 5. Refresh the index
 
 The post-commit hook covers commits. For uncommitted edits (WIP), sync manually
 (it includes the dirty tree):
@@ -107,7 +117,7 @@ The post-commit hook covers commits. For uncommitted edits (WIP), sync manually
 nexspec sync
 ```
 
-### 5. Confirm to user
+### 6. Confirm to user
 
 ```
 Session paused.

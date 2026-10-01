@@ -3,7 +3,7 @@
 > Spec-driven AI coding workflow + NexSpec (Rust) = persistent code+spec graph as a token-efficient context index.
 
 [![License: CC-BY-4.0](https://img.shields.io/badge/License-CC--BY--4.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](SKILL.md)
+[![Version](https://img.shields.io/badge/version-3.1.0-green.svg)](SKILL.md)
 [![Works with](https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20Cursor%20%7C%20Gemini%20CLI%20%7C%20Copilot-orange.svg)](#compatibility)
 
 ---
@@ -93,7 +93,8 @@ Everything lives in `.specs/`:
 
 1. Read `.specs/project/STATE.md` — restores memory from last session
 2. Run `nexspec sync` (incremental, idempotent — no staleness heuristics)
-3. Answer code questions via `nexspec search --max-tokens N` / `trace` / `diff --staged` — not raw file reads
+3. Answer code questions via `nexspec query` / `explain` / `affected` / `path` / `search --max-tokens N` / `trace` / `report` / `diff --staged` — not raw file reads
+4. Record outcomes with `nexspec save-result` / `annotate`; load lessons with `nexspec reflect --max-tokens`; optional opt-in `nexspec enrich` improves prose-question recall
 
 ### Three hard guarantees
 

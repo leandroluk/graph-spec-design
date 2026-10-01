@@ -87,40 +87,49 @@ nexspec sync     # indexes code (Tree-sitter) + .specs/*.md (REQ/TASK/ADR marker
 After upgrading the `nexspec` binary (`cargo install --git … --force`), rebuild the index once when the
 release notes change id/schema semantics: `rm -rf .specs/.index && nexspec init && nexspec sync`.
 
-Optional — register the MCP server so the agent gets `query_context`,
-`trace_requirement`, `find_impacted_code`, `get_symbol_history` and `sync_workspace`
-as native tools:
+Optional — register the MCP server so the agent gets native tools (`query_context`,
+`query_graph`, `find_path`, `explain_node`, `find_affected`, `graph_report`, …):
 
-```json
-{ "mcpServers": { "nexspec": { "command": "nexspec", "args": ["--repo", ".", "mcp"] } } }
+```bash
+nexspec install --platform claude     # or gemini, cursor, vscode (codex: --scope user); --dry-run to preview
 ```
 
 ---
 
-## 0.4 — Install post-commit hook (git projects only)
+## 0.4 — Install git hooks (git projects only)
 
 ```bash
-mkdir -p .git/hooks
-printf '#!/bin/sh\n# graph-spec-design: refresh the NexSpec index after every commit\nnexspec sync > /dev/null 2>&1 &\n' > .git/hooks/post-commit
-chmod +x .git/hooks/post-commit
+nexspec hook install     # post-commit, post-merge, post-checkout → background `nexspec sync`
+nexspec hook status
 ```
 
-On Windows, run this in Git Bash (git executes hooks through its bundled `sh`).
-If a `post-commit` hook already exists, append the `nexspec sync` line instead of overwriting.
+It coexists with existing hooks. Then verify everything once:
+
+```bash
+nexspec doctor           # build, model, index, WAL, hooks, agents, .gitignore — each failure prints its fix
+```
+
+Apply the `.gitignore` fix it suggests (`.specs/.index/`). A missing embedding model is
+only a warning (search falls back to BM25).
+
+For long interactive sessions, `nexspec watch` (or `nexspec mcp --watch`) keeps the index
+fresh on file changes instead of relying on hooks.
 
 ---
 
 ## 0.5 — Seed codebase docs
 
-There is no generated report to read. Seed `.specs/codebase/` with targeted, budgeted
-queries instead of walking the tree:
+Seed `.specs/codebase/` from the structural report instead of walking the tree:
 
 ```bash
-nexspec search "entry point main architecture modules" --max-tokens 2000   # → ARCHITECTURE.md
-nexspec search "error handling retry fallback risk" --max-tokens 1500      # → CONCERNS.md
+nexspec report --max-tokens 3000
 ```
 
-Read at most the 2–3 files the results point to. Record the first `nexspec sync`
+- **God Nodes** → `.specs/codebase/CONCERNS.md` (high-risk, high-fan-in components)
+- **Communities** (+ cohesion) → `.specs/codebase/ARCHITECTURE.md` module groupings
+- **Import Cycles**, **Requirement Coverage** → `CONCERNS.md`
+
+Read at most the 2–3 files it points to for details. Record the first `nexspec sync`
 summary line (added/modified counts) in `.specs/project/STATE.md` under `## Cost`.
 
 ---
@@ -153,7 +162,7 @@ If the file is legacy OR if `$sizeKB > 30` (bash: `$size_bytes -gt 30720`):
 
 If `.specs/graph/` exists from a previous graphify-based install: delete it (it is
 generated), remove any `GRAPHIFY_OUT` / `.graphify_python` lines from
-`.git/hooks/post-commit` (0.4 replaces the hook), and continue at 0.3.
+`.git/hooks/post-commit` (`nexspec hook install` in 0.4 replaces the hook), and continue at 0.3.
 
 ---
 

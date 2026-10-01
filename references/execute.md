@@ -67,6 +67,7 @@ Before committing, see what the change touches structurally:
 
 ```bash
 nexspec diff --staged     # symbols changed in the dirty/staged tree + direct dependants
+nexspec affected <symbol>  # full transitive dependants for a risky change
 ```
 
 Dependants outside the task's scope → verify them (or add them to the gate) before
